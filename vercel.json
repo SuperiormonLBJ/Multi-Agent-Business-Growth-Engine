@@ -1,0 +1,7 @@
+{
+  "buildCommand": null,
+  "outputDirectory": ".",
+  "rewrites": [
+    { "source": "/sites/:path*", "destination": "/sites/:path*" }
+  ]
+}

@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Default theme: amber (Home Services fallback, used in dev mode) */
+    --color-primary: 245 158 11;
+    --color-primary-dark: 217 119 6;
+    --color-primary-light: 254 243 199;
+    --color-gradient-from: 120 53 15;
+    --color-accent-bg: 255 251 235;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
