@@ -27,21 +27,150 @@ loadEnv({ path: resolve(__dirname, '.env'), override: true })
  *   4. Copies built site to sites/[slug]/
  *   5. Writes theme.css (category-specific colors) into the site folder
  *   6. Writes lead-data.js for runtime fallback
- *   7. Prints the outreach message template
+ *   7. Optional screenshot (Playwright + ephemeral local server on a dynamic port)
+ *   8. Appends leads-tracker.csv (Phase C log)
+ *   9. Prints the outreach message template (Phase C uses one shared Stripe Payment Link)
  */
 
 import { execSync } from 'child_process'
-import { writeFileSync, mkdirSync, cpSync } from 'fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { scrapeGoogleMaps } from './services/scout/scraper'
 import type { LeadData } from './shared/types'
 import { resolveCategoryInput } from './shared/resolveCategory'
 import { sanitizeMapsUrlCliInput, validateMapsUrlForCli } from './shared/validateMapsUrl'
 import { getThemeCss } from './services/designer/src/data/themes'
+import { withEphemeralStaticSiteServer } from './shared/ephemeralStaticSiteServer'
 
 const ROOT = resolve(__dirname)
 const DESIGNER_DIR = join(ROOT, 'services', 'designer')
 const SITES_DIR = join(ROOT, 'sites')
 const LEAD_DATA_PATH = join(DESIGNER_DIR, 'src', 'lead-data.json')
+const CSV_PATH = join(ROOT, 'leads-tracker.csv')
+const CSV_HEADER =
+  'slug,business_name,phone,city,category,site_url,screenshot_path,outreach_message,status,created_at\n'
+
+function csvEscapeField(value: string): string {
+  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`
+  return value
+}
+
+/** First column (slug), supports optional surrounding quotes. */
+function csvRowFirstCell(line: string): string {
+  const trimmed = line.trim()
+  if (!trimmed) return ''
+  if (trimmed.startsWith('"')) {
+    let out = ''
+    for (let i = 1; i < trimmed.length; i++) {
+      const c = trimmed[i]!
+      if (c === '"') {
+        if (trimmed[i + 1] === '"') {
+          out += '"'
+          i++
+        } else break
+      } else {
+        out += c
+      }
+    }
+    return out
+  }
+  const comma = trimmed.indexOf(',')
+  return comma === -1 ? trimmed : trimmed.slice(0, comma)
+}
+
+function trackerHasSlug(slug: string): boolean {
+  if (!existsSync(CSV_PATH)) return false
+  const lines = readFileSync(CSV_PATH, 'utf8').split(/\r?\n/)
+  for (let i = 1; i < lines.length; i++) {
+    if (csvRowFirstCell(lines[i]!) === slug) return true
+  }
+  return false
+}
+
+function phaseCSiteBase(): string {
+  return process.env.ALBGE_VERCEL_SITE_BASE?.trim() || '[your-vercel-url]'
+}
+
+function phaseCSetupPaymentLink(): string {
+  return (
+    process.env.STRIPE_PHASE_C_PAYMENT_LINK?.trim() ||
+    '[Create a $99 Payment Link in Stripe — set STRIPE_PHASE_C_PAYMENT_LINK in .env]'
+  )
+}
+
+function buildOutreachParts(lead: LeadData): string[] {
+  const siteBase = phaseCSiteBase()
+  const paymentLink = phaseCSetupPaymentLink()
+  return [
+    `Hi, I noticed ${lead.businessName} doesn't have a website.`,
+    `I built one for you — take a look: ${siteBase}/${lead.slug}`,
+    `Pay $99 setup here: ${paymentLink}`,
+    `$9/mo hosting after that. Interested?`,
+  ]
+}
+
+function buildOutreachMessage(lead: LeadData): string {
+  return buildOutreachParts(lead).join(' ')
+}
+
+async function tryCaptureScreenshot(outDir: string): Promise<boolean> {
+  const outPng = join(outDir, 'screenshot.png')
+  let ok = false
+  try {
+    await withEphemeralStaticSiteServer(outDir, async (origin) => {
+      try {
+        const pw = await import('playwright')
+        const browser = await pw.chromium.launch({ headless: true })
+        try {
+          const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+          await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded', timeout: 8000 })
+          await page.screenshot({ path: outPng, type: 'png' })
+          ok = true
+        } finally {
+          await browser.close()
+        }
+      } catch {
+        ok = false
+      }
+    })
+  } catch (err) {
+    console.error('❌  Local preview server for screenshot failed:', (err as Error).message)
+    return false
+  }
+  return ok
+}
+
+function appendLeadTrackerCsv(args: {
+  lead: LeadData
+  siteUrl: string
+  screenshotPath: string
+  outreachMessage: string
+}): void {
+  const { lead, siteUrl, screenshotPath, outreachMessage } = args
+  if (trackerHasSlug(lead.slug)) {
+    console.log(`⚠️  Lead ${lead.slug} already in tracker — skipping CSV write.`)
+    return
+  }
+  const createdAt = new Date().toISOString()
+  const row = [
+    csvEscapeField(lead.slug),
+    csvEscapeField(lead.businessName),
+    csvEscapeField(lead.phone),
+    csvEscapeField(lead.city),
+    csvEscapeField(lead.category),
+    csvEscapeField(siteUrl),
+    csvEscapeField(screenshotPath),
+    csvEscapeField(outreachMessage),
+    csvEscapeField('outreach_ready'),
+    csvEscapeField(createdAt),
+  ].join(',')
+
+  const empty = !existsSync(CSV_PATH) || readFileSync(CSV_PATH, 'utf8').trim() === ''
+  if (empty) {
+    writeFileSync(CSV_PATH, CSV_HEADER + row + '\n')
+  } else {
+    appendFileSync(CSV_PATH, row + '\n')
+  }
+}
 
 async function run() {
   const urlRaw = process.argv[2]
@@ -111,11 +240,14 @@ async function run() {
   console.log(`    Reviews:  ${lead.reviews.length} five-star showcase (max 10 from API; Details returns up to 5)`)
   console.log(`    Slug:     ${lead.slug}\n`)
 
-  // Write lead data for Vite build-time injection
-  writeFileSync(LEAD_DATA_PATH, JSON.stringify(lead, null, 2))
+  try {
+    writeFileSync(LEAD_DATA_PATH, JSON.stringify(lead, null, 2))
+  } catch (err) {
+    console.error('❌  Could not write lead-data.json:', (err as Error).message)
+    process.exit(1)
+  }
   console.log('📝  Written lead-data.json')
 
-  // Build the React app
   console.log('🏗   Building landing page...\n')
   try {
     execSync('npm run build', {
@@ -127,19 +259,56 @@ async function run() {
     process.exit(1)
   }
 
-  // Copy dist → sites/[slug]/
   const outDir = join(SITES_DIR, lead.slug)
-  mkdirSync(outDir, { recursive: true })
-  cpSync(join(DESIGNER_DIR, 'dist'), outDir, { recursive: true })
+  try {
+    mkdirSync(outDir, { recursive: true })
+    cpSync(join(DESIGNER_DIR, 'dist'), outDir, { recursive: true })
+  } catch (err) {
+    console.error('❌  Could not copy build output to sites/:', (err as Error).message)
+    process.exit(1)
+  }
 
-  // Write theme.css (category-specific colors)
   const themeCss = getThemeCss(lead.category)
-  writeFileSync(join(outDir, 'theme.css'), themeCss)
+  try {
+    writeFileSync(join(outDir, 'theme.css'), themeCss)
+  } catch (err) {
+    console.error('❌  Could not write theme.css:', (err as Error).message)
+    process.exit(1)
+  }
   console.log(`🎨  Theme: ${lead.category}`)
 
-  // Write lead-data.js (runtime data for pre-build template approach)
   const leadDataJs = `window.__LEAD_DATA__ = ${JSON.stringify(lead)};`
-  writeFileSync(join(outDir, 'lead-data.js'), leadDataJs)
+  try {
+    writeFileSync(join(outDir, 'lead-data.js'), leadDataJs)
+  } catch (err) {
+    console.error('❌  Could not write lead-data.js:', (err as Error).message)
+    process.exit(1)
+  }
+
+  console.log('\n📷  Capturing screenshot (optional, Playwright + ephemeral port)...')
+  const shotOk = await tryCaptureScreenshot(outDir)
+  if (shotOk) {
+    console.log(`    Saved: sites/${lead.slug}/screenshot.png`)
+  } else {
+    console.log('    screenshot unavailable (install root deps + run: npx playwright install chromium)')
+  }
+
+  const siteUrl = `${phaseCSiteBase()}/${lead.slug}`
+  const screenshotRel = shotOk ? `sites/${lead.slug}/screenshot.png` : ''
+  const outreachMessage = buildOutreachMessage(lead)
+
+  try {
+    appendLeadTrackerCsv({
+      lead,
+      siteUrl,
+      screenshotPath: screenshotRel,
+      outreachMessage,
+    })
+    console.log('📇  Updated leads-tracker.csv')
+  } catch (err) {
+    console.error('❌  Could not update leads-tracker.csv:', (err as Error).message)
+    process.exit(1)
+  }
 
   console.log(`\n✨  Done! Site built at: sites/${lead.slug}/`)
   console.log(`\n📋  Next steps:`)
@@ -151,9 +320,9 @@ async function run() {
   console.log(`    3. Outreach: send WhatsApp to ${lead.phone}`)
   console.log(`\n    Message template:`)
   console.log(`    ─────────────────────────────────────────────────────────────`)
-  console.log(`    Hi, I noticed ${lead.businessName} doesn't have a website.`)
-  console.log(`    I built one for you — take a look: [your-vercel-url]/${lead.slug}`)
-  console.log(`    $99 one-time setup · $9/mo hosting. Interested?`)
+  for (const line of buildOutreachParts(lead)) {
+    console.log(`    ${line}`)
+  }
   console.log(`    ─────────────────────────────────────────────────────────────\n`)
 }
 
