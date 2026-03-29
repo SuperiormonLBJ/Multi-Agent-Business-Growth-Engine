@@ -1,0 +1,26 @@
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+services/scout/node_modules/
+services/designer/node_modules/
+
+# Build outputs
+dist/
+services/designer/dist/
+sites/
+
+# Generated lead data (contains business PII)
+leads-tracker.csv
+services/designer/src/lead-data.json
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+.gstack/
