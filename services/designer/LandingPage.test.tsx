@@ -39,6 +39,32 @@ describe('LandingPage', () => {
     expect(phoneLinks[0]).toHaveAttribute('href', 'tel:(512) 555-0192')
   })
 
+  it('uses Instagram as primary CTA when no phone but Instagram URL present', () => {
+    const lead: LeadData = {
+      ...MOCK_LEAD,
+      phone: '',
+      instagramUrl: 'https://www.instagram.com/acme_test/',
+    }
+    render(<LandingPage lead={lead} />)
+    const igLinks = screen.getAllByRole('link', { name: /instagram/i })
+    expect(igLinks.some((a) => a.getAttribute('href') === 'https://www.instagram.com/acme_test/')).toBe(true)
+    expect(screen.queryAllByRole('link', { name: /512/ })).toHaveLength(0)
+  })
+
+  it('shows both phone and Instagram in hero when both are present', () => {
+    const lead: LeadData = {
+      ...MOCK_LEAD,
+      instagramUrl: 'https://www.instagram.com/acme_test/',
+    }
+    render(<LandingPage lead={lead} />)
+    const telLinks = screen.getAllByRole('link', { name: /512/ })
+    expect(telLinks.some((a) => a.getAttribute('href') === 'tel:(512) 555-0192')).toBe(true)
+    const igHero = screen.getAllByRole('link', { name: /^instagram$/i }).find(
+      (a) => a.getAttribute('href') === 'https://www.instagram.com/acme_test/'
+    )
+    expect(igHero).toBeTruthy()
+  })
+
   it('renders reviews from lead data', () => {
     render(<LandingPage lead={MOCK_LEAD} />)
     // Reviews contain specific text from MOCK_LEAD

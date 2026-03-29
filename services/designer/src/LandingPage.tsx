@@ -7,6 +7,8 @@ import Reviews from './components/Reviews'
 import ContactSection from './components/ContactSection'
 import Footer from './components/Footer'
 import WhatsAppFab from './components/WhatsAppFab'
+import InstagramFab from './components/InstagramFab'
+import { hasCallablePhone } from '../../../shared/socialContact'
 import PhotoGallery from './components/PhotoGallery'
 import MapSection from './components/MapSection'
 
@@ -15,6 +17,8 @@ interface Props {
 }
 
 export default function LandingPage({ lead }: Props) {
+  const hasPh = hasCallablePhone(lead.phone)
+
   useEffect(() => {
     document.title = `${lead.businessName} — ${lead.category} in ${lead.city || 'Your Area'}`
   }, [lead.businessName, lead.category, lead.city])
@@ -30,6 +34,7 @@ export default function LandingPage({ lead }: Props) {
       <ContactSection lead={lead} />
       <Footer lead={lead} />
       <WhatsAppFab phone={lead.phone} />
+      <InstagramFab instagramUrl={lead.instagramUrl} liftAboveWhatsApp={hasPh} />
     </div>
   )
 }

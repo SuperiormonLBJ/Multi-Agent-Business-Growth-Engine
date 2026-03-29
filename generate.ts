@@ -40,6 +40,7 @@ import { resolveCategoryInput } from './shared/resolveCategory'
 import { sanitizeMapsUrlCliInput, validateMapsUrlForCli } from './shared/validateMapsUrl'
 import { getThemeCss } from './services/designer/src/data/themes'
 import { withEphemeralStaticSiteServer } from './shared/ephemeralStaticSiteServer'
+import { hasCallablePhone } from './shared/socialContact'
 
 const ROOT = resolve(__dirname)
 const DESIGNER_DIR = join(ROOT, 'services', 'designer')
@@ -110,6 +111,14 @@ function buildOutreachParts(lead: LeadData): string[] {
 
 function buildOutreachMessage(lead: LeadData): string {
   return buildOutreachParts(lead).join(' ')
+}
+
+function outreachChannelHint(lead: LeadData): string {
+  const parts: string[] = []
+  if (hasCallablePhone(lead.phone)) parts.push(`WhatsApp ${lead.phone}`)
+  if (lead.instagramUrl) parts.push(`Instagram ${lead.instagramUrl}`)
+  if (parts.length === 0) return 'use on-site contact'
+  return parts.join(' · ')
 }
 
 async function tryCaptureScreenshot(outDir: string): Promise<boolean> {
@@ -234,7 +243,8 @@ async function run() {
     console.log(`    Category: ${lead.category}`)
   }
   console.log(`    Rating:   ${lead.rating} (${lead.reviewCount} reviews)`)
-  console.log(`    Phone:    ${lead.phone}`)
+  console.log(`    Phone:     ${lead.phone || '—'}`)
+  console.log(`    Instagram: ${lead.instagramUrl || '—'}`)
   console.log(`    City:     ${lead.city}`)
   console.log(`    Image:    ${lead.heroImage ? 'Yes' : 'No'}`)
   console.log(`    Reviews:  ${lead.reviews.length} five-star showcase (max 10 from API; Details returns up to 5)`)
@@ -317,7 +327,7 @@ async function run() {
   )
   console.log(`       (Opening index.html as file:// often stays blank — ES modules need http(s).)`)
   console.log(`    2. Deploy:   push to Vercel (auto-serves from sites/ folder)`)
-  console.log(`    3. Outreach: send WhatsApp to ${lead.phone}`)
+  console.log(`    3. Outreach: ${outreachChannelHint(lead)}`)
   console.log(`\n    Message template:`)
   console.log(`    ─────────────────────────────────────────────────────────────`)
   for (const line of buildOutreachParts(lead)) {

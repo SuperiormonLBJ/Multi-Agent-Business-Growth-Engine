@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import type { LeadData } from '../../../../shared/types'
-import { Phone, MapPin, Clock, Send, CheckCircle } from 'lucide-react'
+import { hasCallablePhone, instagramDisplayHandle } from '../../../../shared/socialContact'
+import { Phone, MapPin, Clock, Send, CheckCircle, Instagram } from 'lucide-react'
 
 interface Props {
-  lead: Pick<LeadData, 'phone' | 'address' | 'businessName' | 'city'>
+  lead: Pick<LeadData, 'phone' | 'address' | 'businessName' | 'city' | 'instagramUrl'>
 }
 
 export default function ContactSection({ lead }: Props) {
-  const { phone, businessName, city } = lead
+  const { phone, businessName, city, instagramUrl } = lead
+  const hasPh = hasCallablePhone(phone)
+  const hasIg = Boolean(instagramUrl)
   const [submitted, setSubmitted] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', message: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -16,7 +19,7 @@ export default function ContactSection({ lead }: Props) {
   function validate(): boolean {
     const errs: Record<string, string> = {}
     if (!form.name.trim()) errs.name = 'Name is required'
-    if (!form.phone.trim()) errs.phone = 'Phone number is required'
+    if (hasPh && !form.phone.trim()) errs.phone = 'Phone number is required'
     if (!form.message.trim()) errs.message = 'Please describe your issue'
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -43,7 +46,12 @@ export default function ContactSection({ lead }: Props) {
     } else {
       // Fallback: mailto
       const subject = encodeURIComponent(`New inquiry for ${businessName}`)
-      const body = encodeURIComponent(`Name: ${form.name}\nPhone: ${form.phone}\n\nMessage:\n${form.message}`)
+      const lines = [`Name: ${form.name}`]
+      if (form.phone.trim()) lines.push(`Phone: ${form.phone}`)
+      else if (hasIg) lines.push('Phone: (not provided — prefers Instagram)')
+      if (instagramUrl) lines.push(`Instagram: ${instagramUrl}`)
+      lines.push('', 'Message:', form.message)
+      const body = encodeURIComponent(lines.join('\n'))
       window.location.href = `mailto:?subject=${subject}&body=${body}`
     }
     setSubmitted(true)
@@ -59,17 +67,58 @@ export default function ContactSection({ lead }: Props) {
               Get In Touch
             </span>
             <h2 className="mt-2 text-3xl sm:text-4xl font-black text-white">
-              Ready to help.<br />Call us now.
+              {hasPh && hasIg && (
+                <>
+                  Ready to help.<br />
+                  Call or message us.
+                </>
+              )}
+              {hasPh && !hasIg && (
+                <>
+                  Ready to help.<br />
+                  Call us now.
+                </>
+              )}
+              {!hasPh && hasIg && (
+                <>
+                  Message us today.<br />
+                  We reply fast on Instagram.
+                </>
+              )}
+              {!hasPh && !hasIg && (
+                <>
+                  Get in touch.<br />
+                  We&apos;ll respond soon.
+                </>
+              )}
             </h2>
 
-            <a href={`tel:${phone}`} className="mt-8 flex items-center gap-3 group">
-              <div className="w-12 h-12 rounded-lg bg-theme-primary flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                <Phone className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-3xl sm:text-4xl font-black text-theme-primary group-hover:opacity-80 transition-opacity">
-                {phone || 'Contact Us'}
-              </span>
-            </a>
+            {hasPh && (
+              <a href={`tel:${phone}`} className="mt-8 flex items-center gap-3 group">
+                <div className="w-12 h-12 rounded-lg bg-theme-primary flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                  <Phone className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-3xl sm:text-4xl font-black text-theme-primary group-hover:opacity-80 transition-opacity">
+                  {phone}
+                </span>
+              </a>
+            )}
+
+            {hasIg && instagramUrl && (
+              <a
+                href={instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-3 group ${hasPh ? 'mt-6' : 'mt-8'}`}
+              >
+                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#f09433] via-[#e6683c] to-[#dc2743] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                  <Instagram className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-2xl sm:text-3xl font-black text-white group-hover:opacity-90 transition-opacity">
+                  {instagramDisplayHandle(instagramUrl)}
+                </span>
+              </a>
+            )}
 
             <div className="mt-8 space-y-4">
               <div className="flex items-start gap-3 text-slate-400">
@@ -101,7 +150,19 @@ export default function ContactSection({ lead }: Props) {
                 <CheckCircle className="w-14 h-14 text-theme-primary" />
                 <h3 className="text-white font-bold text-xl">Request sent!</h3>
                 <p className="text-slate-400 text-sm">
-                  We'll call you back within the hour.
+                  {hasPh
+                    ? "We'll call you back within the hour."
+                    : hasIg && instagramUrl
+                      ? (
+                          <>
+                            We&apos;ll reply soon. You can also{' '}
+                            <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="text-theme-primary underline">
+                              DM us on Instagram
+                            </a>
+                            .
+                          </>
+                        )
+                      : "We'll get back to you shortly."}
                 </p>
               </motion.div>
             ) : (
@@ -122,12 +183,14 @@ export default function ContactSection({ lead }: Props) {
                     {errors.name && <p className="mt-1 text-xs text-red-400">{errors.name}</p>}
                   </div>
                   <div>
-                    <label htmlFor="phone-input" className="block text-xs text-slate-400 mb-1.5">Phone Number</label>
+                    <label htmlFor="phone-input" className="block text-xs text-slate-400 mb-1.5">
+                      {hasPh ? 'Phone Number' : 'Phone (optional)'}
+                    </label>
                     <input
                       id="phone-input"
-                      required
+                      required={hasPh}
                       type="tel"
-                      placeholder="(512) 555-0100"
+                      placeholder={hasPh ? '(512) 555-0100' : 'If you prefer a call back'}
                       value={form.phone}
                       onChange={(e) => { setForm({ ...form, phone: e.target.value }); setErrors({ ...errors, phone: '' }) }}
                       className="w-full bg-slate-700/50 border border-slate-600 text-white placeholder-slate-500 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-theme-primary/50 focus:border-theme-primary transition-all"

@@ -1,11 +1,14 @@
 import type { LeadData } from '../../../../shared/types'
+import { hasCallablePhone, instagramDisplayHandle } from '../../../../shared/socialContact'
 
 interface Props {
-  lead: Pick<LeadData, 'businessName' | 'phone' | 'address' | 'city'>
+  lead: Pick<LeadData, 'businessName' | 'phone' | 'address' | 'city' | 'instagramUrl'>
 }
 
 export default function Footer({ lead }: Props) {
-  const { businessName, phone, city } = lead
+  const { businessName, phone, city, instagramUrl } = lead
+  const hasPh = hasCallablePhone(phone)
+  const hasIg = Boolean(instagramUrl)
   const year = new Date().getFullYear()
 
   return (
@@ -14,8 +17,29 @@ export default function Footer({ lead }: Props) {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="text-white font-semibold">{businessName}</p>
-            <p className="text-slate-500 text-sm mt-0.5">
-              {city || 'Local'} · {phone}
+            <p className="text-slate-500 text-sm mt-0.5 flex flex-wrap items-center gap-x-1 gap-y-0.5">
+              <span>{city || 'Local'}</span>
+              {hasPh && (
+                <>
+                  <span aria-hidden>·</span>
+                  <a href={`tel:${phone}`} className="hover:text-slate-400 transition-colors">
+                    {phone}
+                  </a>
+                </>
+              )}
+              {hasIg && instagramUrl && (
+                <>
+                  <span aria-hidden>·</span>
+                  <a
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-slate-400 transition-colors"
+                  >
+                    {instagramDisplayHandle(instagramUrl)}
+                  </a>
+                </>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-5 text-sm text-slate-600">

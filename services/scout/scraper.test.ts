@@ -14,6 +14,11 @@ import {
 import type { Review } from '../../shared/types'
 import { resolveCategoryInput } from '../../shared/resolveCategory'
 import { sanitizeMapsUrlCliInput, validateMapsUrlForCli } from '../../shared/validateMapsUrl'
+import {
+  extractInstagramProfileUrl,
+  hasCallablePhone,
+  instagramDisplayHandle,
+} from '../../shared/socialContact'
 
 describe('parseGoogleMapsUrl', () => {
   it('parses place name and coordinates', () => {
@@ -125,6 +130,29 @@ describe('validateMapsUrlForCli', () => {
   it('accepts paste after sanitize (generate.ts pipeline)', () => {
     const messy = 'https://google.com/maps/x > run_tests.py << EOF\nimport pytest'
     expect(validateMapsUrlForCli(sanitizeMapsUrlCliInput(messy)).ok).toBe(true)
+  })
+})
+
+describe('socialContact', () => {
+  it('detects callable phone', () => {
+    expect(hasCallablePhone('')).toBe(false)
+    expect(hasCallablePhone('call me')).toBe(false)
+    expect(hasCallablePhone('+65 8171 7195')).toBe(true)
+  })
+
+  it('extracts Instagram profile from Places website URI', () => {
+    expect(extractInstagramProfileUrl('https://www.instagram.com/atriumelectrical/')).toBe(
+      'https://www.instagram.com/atriumelectrical/'
+    )
+    expect(extractInstagramProfileUrl('https://instagram.com/foo/reels/')).toBe(
+      'https://www.instagram.com/foo/'
+    )
+    expect(extractInstagramProfileUrl('https://example.com')).toBeUndefined()
+    expect(extractInstagramProfileUrl('https://www.instagram.com/reel/abc123/')).toBeUndefined()
+  })
+
+  it('instagramDisplayHandle', () => {
+    expect(instagramDisplayHandle('https://www.instagram.com/bar_biz/')).toBe('@bar_biz')
   })
 })
 

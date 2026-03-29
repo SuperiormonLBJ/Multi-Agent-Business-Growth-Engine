@@ -15,6 +15,8 @@ export interface LeadData {
   address: string
   city: string
   website?: string
+  /** Normalized profile URL when website (or future fields) point to Instagram */
+  instagramUrl?: string
   heroImage?: string
   /** Google Places place id (resource id), when available from Details */
   placeId?: string

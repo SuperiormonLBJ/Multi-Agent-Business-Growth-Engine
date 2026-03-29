@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
 import type { LeadData } from '../../../../shared/types'
 import { getTheme } from '../data/themes'
-import { Phone, ChevronRight, ShieldCheck } from 'lucide-react'
+import { Phone, ChevronRight, ShieldCheck, Instagram } from 'lucide-react'
+import { hasCallablePhone } from '../../../../shared/socialContact'
 import { cn } from '../lib/utils'
 
 interface Props {
@@ -15,7 +16,9 @@ function heroFontSize(name: string): string {
 }
 
 export default function Hero({ lead }: Props) {
-  const { businessName, category, phone, city, heroImage } = lead
+  const { businessName, category, phone, city, heroImage, instagramUrl } = lead
+  const hasPh = hasCallablePhone(phone)
+  const hasIg = Boolean(instagramUrl)
   const theme = getTheme(category)
   const HeroIcon = theme.heroIcon
 
@@ -68,15 +71,41 @@ export default function Hero({ lead }: Props) {
             </p>
           </div>
 
-          {/* CTAs */}
-          <div className="mt-10 flex flex-col sm:flex-row gap-4">
-            <a
-              href={`tel:${phone}`}
-              className="inline-flex items-center justify-center gap-3 bg-theme-primary hover:bg-theme-primary/90 text-white font-bold text-lg px-8 py-4 rounded-lg transition-all shadow-lg shadow-theme-primary/25 hover:shadow-xl hover:shadow-theme-primary/30"
-            >
-              <Phone className="w-5 h-5" />
-              {phone || 'Call Us'}
-            </a>
+          {/* CTAs — phone and/or Instagram; quote stays secondary */}
+          <div className="mt-10 flex flex-col sm:flex-row flex-wrap gap-4">
+            {hasPh && (
+              <a
+                href={`tel:${phone}`}
+                className="inline-flex items-center justify-center gap-3 bg-theme-primary hover:bg-theme-primary/90 text-white font-bold text-lg px-8 py-4 rounded-lg transition-all shadow-lg shadow-theme-primary/25 hover:shadow-xl hover:shadow-theme-primary/30"
+              >
+                <Phone className="w-5 h-5" />
+                {phone}
+              </a>
+            )}
+            {hasIg && (
+              <a
+                href={instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center justify-center gap-3 font-bold text-lg px-8 py-4 rounded-lg transition-all shadow-lg text-white ${
+                  hasPh
+                    ? 'bg-gradient-to-br from-[#f09433] via-[#e6683c] to-[#dc2743] hover:opacity-95 shadow-[#dc2743]/20'
+                    : 'bg-theme-primary hover:bg-theme-primary/90 shadow-theme-primary/25 hover:shadow-xl hover:shadow-theme-primary/30'
+                }`}
+              >
+                <Instagram className="w-5 h-5" />
+                {hasPh ? 'Instagram' : 'Message on Instagram'}
+              </a>
+            )}
+            {!hasPh && !hasIg && (
+              <a
+                href="#contact"
+                className="inline-flex items-center justify-center gap-3 bg-theme-primary hover:bg-theme-primary/90 text-white font-bold text-lg px-8 py-4 rounded-lg transition-all shadow-lg shadow-theme-primary/25"
+              >
+                Get in touch
+                <ChevronRight className="w-5 h-5" />
+              </a>
+            )}
             <a
               href="#contact"
               className="inline-flex items-center justify-center gap-2 border border-white/20 hover:border-white/40 hover:bg-white/5 text-white font-semibold text-lg px-8 py-4 rounded-lg transition-all"

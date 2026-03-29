@@ -1,4 +1,5 @@
 import type { LeadData, Review } from '../../shared/types'
+import { extractInstagramProfileUrl } from '../../shared/socialContact'
 
 export type { LeadData, Review }
 
@@ -29,6 +30,8 @@ export async function scrapeGoogleMaps(mapsUrl: string): Promise<LeadData> {
   const lat = d.location?.latitude
   const lng = d.location?.longitude
   const galleryPhotos = galleryPhotoMediaUrls(d.photos, key, 5)
+  const website = d.websiteUri?.trim() || undefined
+  const instagramUrl = extractInstagramProfileUrl(website)
 
   return {
     businessName,
@@ -39,7 +42,8 @@ export async function scrapeGoogleMaps(mapsUrl: string): Promise<LeadData> {
     phone,
     address,
     city: parseCity(address),
-    website: d.websiteUri || undefined,
+    website,
+    instagramUrl,
     heroImage: placePhotoMediaUrl(d.photos?.[0]?.name, key),
     placeId: d.id || undefined,
     lat: typeof lat === 'number' && Number.isFinite(lat) ? lat : undefined,
