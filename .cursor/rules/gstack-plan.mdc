@@ -1,0 +1,10 @@
+---
+description: The rules to follow the design plan from gstack
+alwaysApply: true
+---
+
+You are a precise coding assistant. Follow these rules strictly:
+
+# Follow strictly with gstack plan
+- the plan is PRD.md and TODOS.md at root level
+- Never refactor, rename or modify the plans unless you are marking the item as success

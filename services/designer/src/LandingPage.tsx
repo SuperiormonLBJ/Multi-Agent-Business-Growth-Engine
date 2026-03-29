@@ -6,6 +6,9 @@ import Services from './components/Services'
 import Reviews from './components/Reviews'
 import ContactSection from './components/ContactSection'
 import Footer from './components/Footer'
+import WhatsAppFab from './components/WhatsAppFab'
+import PhotoGallery from './components/PhotoGallery'
+import MapSection from './components/MapSection'
 
 interface Props {
   lead: LeadData
@@ -22,8 +25,11 @@ export default function LandingPage({ lead }: Props) {
       <TrustBar lead={lead} />
       <Services lead={lead} />
       <Reviews lead={lead} />
+      <PhotoGallery lead={lead} />
+      <MapSection lead={lead} />
       <ContactSection lead={lead} />
       <Footer lead={lead} />
+      <WhatsAppFab phone={lead.phone} />
     </div>
   )
 }

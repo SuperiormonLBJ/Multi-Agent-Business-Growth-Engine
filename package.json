@@ -6,10 +6,12 @@
     "generate": "ts-node generate.ts",
     "install:all": "npm install && npm install --prefix services/scout && npm install --prefix services/designer",
     "test": "npm test --prefix services/scout && npm test --prefix services/designer",
-    "dev": "npm run dev --prefix services/designer"
+    "dev": "npm run dev --prefix services/designer",
+    "new-site-repo": "bash scripts/new-site-repo.sh"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "dotenv": "^17.3.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.0"
   }

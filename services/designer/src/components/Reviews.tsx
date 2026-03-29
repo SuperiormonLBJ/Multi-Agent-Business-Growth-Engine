@@ -103,9 +103,12 @@ const FALLBACK_REVIEWS: Review[] = [
   },
 ]
 
+const SHOWCASE_MAX = 10
+
 export default function Reviews({ lead }: Props) {
   const { rating, reviewCount, reviews, businessName } = lead
-  const displayReviews = reviews.length >= 2 ? reviews.slice(0, 3) : FALLBACK_REVIEWS
+  const displayReviews =
+    reviews.length > 0 ? reviews.slice(0, SHOWCASE_MAX) : FALLBACK_REVIEWS.slice(0, 3)
   const [featured, ...supporting] = displayReviews
 
   return (
@@ -135,9 +138,9 @@ export default function Reviews({ lead }: Props) {
         <div className="space-y-4">
           {featured && <FeaturedReview review={featured} />}
           {supporting.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {supporting.map((review, i) => (
-                <SmallReview key={i} review={review} delay={0.1 * (i + 1)} />
+                <SmallReview key={i} review={review} delay={0.05 * (i + 1)} />
               ))}
             </div>
           )}

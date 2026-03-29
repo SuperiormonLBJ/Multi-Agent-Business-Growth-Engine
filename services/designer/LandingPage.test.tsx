@@ -17,6 +17,12 @@ const MOCK_LEAD: LeadData = {
   phone: '(512) 555-0192',
   address: '4801 Research Blvd, Austin, TX 78759, USA',
   city: 'Austin, TX',
+  lat: 30.4022,
+  lng: -97.7205,
+  galleryPhotos: [
+    'https://example.com/g1.jpg',
+    'https://example.com/g2.jpg',
+  ],
   mapsUrl: 'https://www.google.com/maps',
   slug: 'austin-pro-plumbing',
 }
@@ -91,5 +97,17 @@ describe('LandingPage', () => {
     render(<LandingPage lead={lead} />)
     expect(screen.getByText('Lockout Service')).toBeInTheDocument()
     expect(screen.getByText('Smart Locks')).toBeInTheDocument()
+  })
+
+  it('renders photo gallery when galleryPhotos are present', () => {
+    render(<LandingPage lead={MOCK_LEAD} />)
+    expect(screen.getByRole('heading', { name: /photo gallery/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('img', { name: /austin pro plumbing — photo/i })).toHaveLength(2)
+  })
+
+  it('renders map section with embedded map', () => {
+    render(<LandingPage lead={MOCK_LEAD} />)
+    expect(screen.getByRole('heading', { name: /find us on the map/i })).toBeInTheDocument()
+    expect(screen.getByTitle(/map showing austin pro plumbing location/i)).toBeInTheDocument()
   })
 })

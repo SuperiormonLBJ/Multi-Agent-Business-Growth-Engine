@@ -1,3 +1,5 @@
+import '@testing-library/jest-dom/vitest'
+
 // Mock IntersectionObserver for framer-motion whileInView
 class MockIntersectionObserver {
   observe() {}

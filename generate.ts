@@ -1,4 +1,11 @@
 #!/usr/bin/env ts-node
+import { resolve, join } from 'path'
+import { config as loadEnv } from 'dotenv'
+
+// Repo-root .env must win over any GOOGLE_* keys already exported in the shell
+// (dotenv default override:false leaves stale keys from ~/.zshrc and breaks Places).
+loadEnv({ path: resolve(__dirname, '.env'), override: true })
+
 /**
  * generate.ts — CLI orchestrator for Phase C/A
  *
@@ -6,7 +13,7 @@
  *   npx ts-node generate.ts "https://www.google.com/maps/place/..."
  *
  * Pipeline:
- *   1. Scrapes the Google Maps URL for business data
+ *   1. Resolves the place via Google Places API (GOOGLE_PLACES_API_KEY) from the Maps URL
  *   2. Writes lead-data.json for Vite build-time injection
  *   3. Runs `npm run build` in services/designer
  *   4. Copies built site to sites/[slug]/
@@ -17,8 +24,7 @@
 
 import { execSync } from 'child_process'
 import { writeFileSync, mkdirSync, cpSync } from 'fs'
-import { resolve, join } from 'path'
-import { scrapeGoogleMaps, closeBrowser } from './services/scout/scraper'
+import { scrapeGoogleMaps } from './services/scout/scraper'
 import type { LeadData } from './shared/types'
 import { getThemeCss } from './services/designer/src/data/themes'
 
@@ -36,15 +42,14 @@ async function run() {
     process.exit(1)
   }
 
-  console.log('\n🔍  Scraping Google Maps...')
+  console.log('\n🔍  Resolving place (Google Places API)...')
   console.log(`    URL: ${url}\n`)
 
   let lead: LeadData
   try {
     lead = await scrapeGoogleMaps(url)
-    await closeBrowser()
   } catch (err) {
-    console.error('❌  Scraping failed:', err)
+    console.error('❌  Lead fetch failed:', err)
     process.exit(1)
   }
 
@@ -55,7 +60,7 @@ async function run() {
   console.log(`    Phone:    ${lead.phone}`)
   console.log(`    City:     ${lead.city}`)
   console.log(`    Image:    ${lead.heroImage ? 'Yes' : 'No'}`)
-  console.log(`    Reviews:  ${lead.reviews.length} scraped`)
+  console.log(`    Reviews:  ${lead.reviews.length} five-star showcase (max 10 from API; Details returns up to 5)`)
   console.log(`    Slug:     ${lead.slug}\n`)
 
   // Write lead data for Vite build-time injection
@@ -90,7 +95,10 @@ async function run() {
 
   console.log(`\n✨  Done! Site built at: sites/${lead.slug}/`)
   console.log(`\n📋  Next steps:`)
-  console.log(`    1. Preview:  open sites/${lead.slug}/index.html`)
+  console.log(
+    `    1. Preview:  cd sites/${lead.slug} && python3 -m http.server 8080  →  http://localhost:8080/`
+  )
+  console.log(`       (Opening index.html as file:// often stays blank — ES modules need http(s).)`)
   console.log(`    2. Deploy:   push to Vercel (auto-serves from sites/ folder)`)
   console.log(`    3. Outreach: send WhatsApp to ${lead.phone}`)
   console.log(`\n    Message template:`)
