@@ -12,6 +12,8 @@ import {
   scrapeGoogleMaps,
 } from './scraper'
 import type { Review } from '../../shared/types'
+import { resolveCategoryInput } from '../../shared/resolveCategory'
+import { sanitizeMapsUrlCliInput, validateMapsUrlForCli } from '../../shared/validateMapsUrl'
 
 describe('parseGoogleMapsUrl', () => {
   it('parses place name and coordinates', () => {
@@ -69,8 +71,82 @@ describe('typesToCategory', () => {
     expect(typesToCategory(['plumber', 'point_of_interest'], 'X')).toBe('Plumber')
   })
 
+  it('prefers Handyman when Places lists both handyman and plumber', () => {
+    expect(typesToCategory(['plumber', 'handyman', 'establishment'], 'X')).toBe('Handyman')
+  })
+
   it('falls back to name inference', () => {
     expect(typesToCategory(['establishment'], 'Sam Handyman Pro')).toBe('Handyman')
+  })
+})
+
+describe('sanitizeMapsUrlCliInput', () => {
+  it('keeps a clean URL unchanged', () => {
+    const u = 'https://www.google.com/maps/place/Foo/@1.2,103.8,14z/data=!3m1'
+    expect(sanitizeMapsUrlCliInput(u)).toBe(u)
+  })
+
+  it('takes first line only', () => {
+    expect(sanitizeMapsUrlCliInput('https://google.com/maps/x\n#!/usr/bin/env python3')).toBe(
+      'https://google.com/maps/x'
+    )
+    expect(sanitizeMapsUrlCliInput('\nhttps://google.com/maps/x\nimport pytest')).toBe(
+      'https://google.com/maps/x'
+    )
+  })
+
+  it('strips redirect and heredoc on same line', () => {
+    expect(sanitizeMapsUrlCliInput("https://google.com/maps/x > run_tests.py << 'EOF'")).toBe(
+      'https://google.com/maps/x'
+    )
+  })
+})
+
+describe('validateMapsUrlForCli', () => {
+  it('accepts a normal Google Maps URL', () => {
+    expect(
+      validateMapsUrlForCli(
+        'https://www.google.com/maps/place/Foo/@1.2,103.8,14z/data=!3m1'
+      ).ok
+    ).toBe(true)
+  })
+
+  it('rejects newlines and heredoc paste (without sanitize)', () => {
+    expect(validateMapsUrlForCli('https://google.com/maps/x\nimport pytest').ok).toBe(false)
+    expect(validateMapsUrlForCli("https://google.com/maps/x << 'EOF'").ok).toBe(false)
+  })
+
+  it('rejects shell redirect after URL (without sanitize)', () => {
+    const r = validateMapsUrlForCli('https://google.com/maps/x > run_tests.py')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.message).toMatch(/redirect/)
+  })
+
+  it('accepts paste after sanitize (generate.ts pipeline)', () => {
+    const messy = 'https://google.com/maps/x > run_tests.py << EOF\nimport pytest'
+    expect(validateMapsUrlForCli(sanitizeMapsUrlCliInput(messy)).ok).toBe(true)
+  })
+})
+
+describe('resolveCategoryInput', () => {
+  it('accepts lowercase aliases', () => {
+    expect(resolveCategoryInput('handyman')).toEqual({ ok: true, category: 'Handyman' })
+    expect(resolveCategoryInput('plumbing')).toEqual({ ok: true, category: 'Plumber' })
+  })
+
+  it('accepts canonical labels with different casing', () => {
+    expect(resolveCategoryInput('HVAC')).toEqual({ ok: true, category: 'HVAC' })
+    expect(resolveCategoryInput('cleaning service')).toEqual({ ok: true, category: 'Cleaning Service' })
+  })
+
+  it('accepts kebab slug', () => {
+    expect(resolveCategoryInput('auto-repair')).toEqual({ ok: true, category: 'Auto Repair' })
+  })
+
+  it('rejects unknown labels', () => {
+    const r = resolveCategoryInput('not-a-real-trade')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.message).toContain('Unknown category')
   })
 })
 

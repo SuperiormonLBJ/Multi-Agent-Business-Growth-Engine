@@ -307,6 +307,8 @@ function normalizePhoneForTel(raw: string): string {
 
 export function typesToCategory(types: string[], businessName: string): string {
   const t = new Set(types.map((x) => x.toLowerCase()))
+  // Prefer generalist types when Places returns several (e.g. handyman + plumber).
+  if (t.has('handyman') || t.has('general_contractor')) return 'Handyman'
   if (t.has('plumber')) return 'Plumber'
   if (t.has('electrician')) return 'Electrician'
   if (t.has('roofing_contractor')) return 'Roofing'
@@ -316,7 +318,6 @@ export function typesToCategory(types: string[], businessName: string): string {
   if (t.has('car_repair') || t.has('car_dealer')) return 'Auto Repair'
   if (t.has('laundry')) return 'Cleaning Service'
   if (t.has('landscaper') || t.has('gardener')) return 'Landscaping'
-  if (t.has('general_contractor') || t.has('handyman')) return 'Handyman'
   if (t.has('hvac_contractor')) return 'HVAC'
   if (t.has('pest_control_service')) return 'Pest Control'
   return inferCategory(businessName)

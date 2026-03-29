@@ -10,6 +10,6 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["generate.ts"],
+  "include": ["generate.ts", "shared/**/*.ts"],
   "exclude": ["node_modules", "services", "sites"]
 }

@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Create a standalone git repo for one built site: run generate, then seed from template + copy dist output.
 # Usage:
-#   ./scripts/new-site-repo.sh "<google-maps-url>" [parent-directory]
+#   ./scripts/new-site-repo.sh "<google-maps-url>" [category] [parent-directory]
+#   Category is optional; use a word like handyman or plumber (see generate.ts). Paths for
+#   parent-directory should start with /, ./, ../, or be an existing directory so they are
+#   not mistaken for a category. Alternatively: ALBGE_CATEGORY=handyman ./scripts/...
 #
 # Environment:
 #   ALBGE_SITE_TEMPLATE_REPO  — if set, `git clone <url> <dest>` instead of copying templates/site-repo
@@ -13,17 +16,41 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENGINE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MAPS_URL="${1:-}"
-PARENT_DIR="${2:-"$(dirname "$ENGINE_ROOT")"}"
+CATEGORY_ARG=""
+PARENT_DIR=""
 TEMPLATE_LOCAL="$ENGINE_ROOT/templates/site-repo"
 
+is_parent_dir_arg() {
+  local a="${1:-}"
+  [[ "$a" == . || "$a" == .. ]] && return 0
+  [[ "$a" == /* || "$a" == ./* || "$a" == ../* ]] && return 0
+  [[ -n "$a" && -d "$a" ]] && return 0
+  return 1
+}
+
 usage() {
-  echo "Usage: $0 \"<google-maps-url>\" [parent-directory]" >&2
+  echo "Usage: $0 \"<google-maps-url>\" [category] [parent-directory]" >&2
   echo "  parent-directory defaults to the folder containing the engine repo (sibling path)." >&2
+  echo "  Optional category overrides Places (e.g. handyman). Or set ALBGE_CATEGORY." >&2
   echo "  Set ALBGE_SITE_TEMPLATE_REPO to a git URL to clone that template instead of templates/site-repo." >&2
   exit 1
 }
 
 [[ -n "$MAPS_URL" ]] || usage
+
+if [[ -n "${2:-}" ]]; then
+  if is_parent_dir_arg "$2"; then
+    PARENT_DIR="$2"
+  else
+    CATEGORY_ARG="$2"
+    if [[ -n "${3:-}" ]]; then
+      PARENT_DIR="$3"
+    fi
+  fi
+fi
+
+PARENT_DIR="${PARENT_DIR:-$(dirname "$ENGINE_ROOT")}"
+CATEGORY_ARG="${ALBGE_CATEGORY:-$CATEGORY_ARG}"
 
 if [[ ! -f "$ENGINE_ROOT/.env" ]]; then
   echo "Warning: no .env at repo root — GOOGLE_PLACES_API_KEY may be missing." >&2
@@ -32,7 +59,11 @@ fi
 cd "$ENGINE_ROOT"
 
 echo "→ Running generate (builds into sites/<slug>/ )..."
-npx ts-node generate.ts "$MAPS_URL"
+if [[ -n "$CATEGORY_ARG" ]]; then
+  npx ts-node generate.ts "$MAPS_URL" "$CATEGORY_ARG"
+else
+  npx ts-node generate.ts "$MAPS_URL"
+fi
 
 SLUG="$(node -p "require('./services/designer/src/lead-data.json').slug")"
 if [[ -z "$SLUG" || "$SLUG" == "undefined" ]]; then

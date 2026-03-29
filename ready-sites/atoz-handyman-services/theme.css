@@ -1,7 +1,7 @@
 :root {
-  --color-primary: 59 130 246;
-  --color-primary-dark: 30 64 175;
-  --color-primary-light: 191 219 254;
-  --color-gradient-from: 30 58 138;
-  --color-accent-bg: 239 246 255;
+  --color-primary: 245 158 11;
+  --color-primary-dark: 217 119 6;
+  --color-primary-light: 254 243 199;
+  --color-gradient-from: 120 53 15;
+  --color-accent-bg: 255 251 235;
 }

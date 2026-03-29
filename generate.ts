@@ -11,6 +11,14 @@ loadEnv({ path: resolve(__dirname, '.env'), override: true })
  *
  * Usage:
  *   npx ts-node generate.ts "https://www.google.com/maps/place/..."
+ *   npx ts-node generate.ts "https://..." "<category>"
+ *
+ * Optional category (2nd arg) overrides Google Places–inferred type. Accepts canonical
+ * names (e.g. Handyman, Plumber) or aliases (handyman, plumbing, hvac, …).
+ *
+ * Quote the URL: `npm run generate -- "https://maps..." handyman`. If you paste a redirect
+ * or extra lines by mistake, the first line is trimmed when possible; zsh may still run any
+ * lines that were pasted *outside* the quoted string — use Ctrl+C and paste again if so.
  *
  * Pipeline:
  *   1. Resolves the place via Google Places API (GOOGLE_PLACES_API_KEY) from the Maps URL
@@ -26,6 +34,8 @@ import { execSync } from 'child_process'
 import { writeFileSync, mkdirSync, cpSync } from 'fs'
 import { scrapeGoogleMaps } from './services/scout/scraper'
 import type { LeadData } from './shared/types'
+import { resolveCategoryInput } from './shared/resolveCategory'
+import { sanitizeMapsUrlCliInput, validateMapsUrlForCli } from './shared/validateMapsUrl'
 import { getThemeCss } from './services/designer/src/data/themes'
 
 const ROOT = resolve(__dirname)
@@ -34,12 +44,41 @@ const SITES_DIR = join(ROOT, 'sites')
 const LEAD_DATA_PATH = join(DESIGNER_DIR, 'src', 'lead-data.json')
 
 async function run() {
-  const url = process.argv[2]
+  const urlRaw = process.argv[2]
+  const categoryArg = process.argv[3]?.trim()
 
-  if (!url || !url.startsWith('http')) {
-    console.error('Usage: npx ts-node generate.ts "<google-maps-url>"')
-    console.error('Example: npx ts-node generate.ts "https://www.google.com/maps/place/..."')
+  if (!urlRaw?.trim()) {
+    console.error('Usage: npx ts-node generate.ts "<google-maps-url>" [category]')
+    console.error('Example: npx ts-node generate.ts "https://www.google.com/maps/place/..." handyman')
     process.exit(1)
+  }
+
+  const url = sanitizeMapsUrlCliInput(urlRaw)
+  if (url !== urlRaw.trim()) {
+    console.warn(
+      '⚠️  Trimmed the Maps URL (extra lines and/or shell `>` / `<<` after the link). Check the URL below is complete.\n'
+    )
+  }
+
+  if (!url.startsWith('http')) {
+    console.error('❌  Could not find an http(s) Maps URL at the start of the first line.')
+    process.exit(1)
+  }
+
+  const urlCheck = validateMapsUrlForCli(url)
+  if (!urlCheck.ok) {
+    console.error(`❌  ${urlCheck.message}`)
+    process.exit(1)
+  }
+
+  let categoryOverride: string | undefined
+  if (categoryArg) {
+    const resolved = resolveCategoryInput(categoryArg)
+    if (!resolved.ok) {
+      console.error(`❌  ${resolved.message}`)
+      process.exit(1)
+    }
+    categoryOverride = resolved.category
   }
 
   console.log('\n🔍  Resolving place (Google Places API)...')
@@ -53,9 +92,18 @@ async function run() {
     process.exit(1)
   }
 
+  const inferredCategory = lead.category
+  if (categoryOverride) {
+    lead = { ...lead, category: categoryOverride }
+  }
+
   console.log('✅  Found business:')
   console.log(`    Name:     ${lead.businessName}`)
-  console.log(`    Category: ${lead.category}`)
+  if (categoryOverride && inferredCategory !== lead.category) {
+    console.log(`    Category: ${lead.category} (overrides Places: ${inferredCategory})`)
+  } else {
+    console.log(`    Category: ${lead.category}`)
+  }
   console.log(`    Rating:   ${lead.rating} (${lead.reviewCount} reviews)`)
   console.log(`    Phone:    ${lead.phone}`)
   console.log(`    City:     ${lead.city}`)
